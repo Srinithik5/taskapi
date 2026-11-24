@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Secure Task Manager</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">Secure Task Manager</span>
+  </div>
+  <div id="userBar" class="user-bar hidden">
+    <span id="userLabel" class="user-label"></span>
+    <button id="logoutBtn" class="btn btn-ghost">Log out</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===================== AUTH VIEW ===================== -->
+  <section id="authView" class="auth-view">
+    <div class="hero">
+      <h1>A REST API that actually protects your data.</h1>
+      <p class="hero-sub">
+        Built as a hands-on security project: every user sees only their own tasks,
+        enforced at the database query level - not just hidden in the UI. Passwords are
+        BCrypt-hashed, sessions are stateless JWTs, and admins are bootstrapped from
+        environment variables, never a self-service "make me admin" button.
+      </p>
+      <div class="badges">
+        <span class="badge">Java 21</span>
+        <span class="badge">Spring Boot 3</span>
+        <span class="badge">Spring Security 6 + JWT</span>
+        <span class="badge">PostgreSQL</span>
+        <span class="badge">Docker</span>
+        <span class="badge">OWASP-aware</span>
+      </div>
+    </div>
+
+    <div class="auth-card glass">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="login">Log in</button>
+        <button class="tab-btn" data-tab="register">Register</button>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <label>Email
+          <input type="email" id="loginEmail" required placeholder="you@example.com" />
+        </label>
+        <label>Password
+          <input type="password" id="loginPassword" required placeholder="••••••••" />
+        </label>
+        <div class="field-error" id="loginError"></div>
+        <button type="submit" class="btn btn-primary">Log in</button>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden">
+        <label>Name
+          <input type="text" id="registerName" required placeholder="Your name" />
+        </label>
+        <label>Email
+          <input type="email" id="registerEmail" required placeholder="you@example.com" />
+        </label>
+        <label>Password
+          <input type="password" id="registerPassword" required placeholder="At least 8 characters" />
+        </label>
+        <div class="field-error" id="registerError"></div>
+        <button type="submit" class="btn btn-primary">Create account</button>
+      </form>
+
+      <p class="hint">
+        Local dev admin (from <code>.env</code> defaults): <code>admin@example.com</code> /
+        <code>AdminPass123!</code>
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== APP VIEW ===================== -->
+  <section id="appView" class="app-view hidden">
+
+    <nav class="side-nav">
+      <button class="nav-link active" data-view="tasks">My Tasks</button>
+      <button class="nav-link hidden" id="adminNavBtn" data-view="admin">Admin</button>
+    </nav>
+
+    <div class="content">
+
+      <!-- My Tasks -->
+      <div id="tasksPanel" class="panel">
+        <div class="panel-header">
+          <h2>My Tasks</h2>
+          <button id="newTaskBtn" class="btn btn-primary">+ New Task</button>
+        </div>
+
+        <div class="toolbar">
+          <label class="toolbar-field">Status
+            <select id="statusFilter">
+              <option value="">All</option>
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In progress</option>
+              <option value="DONE">Done</option>
+            </select>
+          </label>
+          <label class="toolbar-field">Sort by
+            <select id="sortOrder">
+              <option value="createdAt,desc">Newest first</option>
+              <option value="createdAt,asc">Oldest first</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="taskGrid" class="task-grid"></div>
+        <div id="taskEmpty" class="empty-state hidden">No tasks yet - create your first one.</div>
+
+        <div class="pagination">
+          <button id="prevPage" class="btn btn-ghost">&larr; Prev</button>
+          <span id="pageLabel" class="page-label"></span>
+          <button id="nextPage" class="btn btn-ghost">Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Admin -->
+      <div id="adminPanel" class="panel hidden">
+        <h2>Admin</h2>
+
+        <h3>All users</h3>
+        <div class="table-wrap">
+          <table class="data-table" id="usersTable">
+            <thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Role</th><th>Created</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <h3>All tasks</h3>
+        <div class="table-wrap">
+          <table class="data-table" id="allTasksTable">
+            <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Owner ID</th><th>Created</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<!-- Task create/edit modal -->
+<div id="taskModal" class="modal-backdrop hidden">
+  <div class="modal glass">
+    <h3 id="modalTitle">New Task</h3>
+    <form id="taskForm">
+      <label>Title
+        <input type="text" id="taskTitle" maxlength="100" required />
+      </label>
+      <label>Description
+        <textarea id="taskDescription" rows="3"></textarea>
+      </label>
+      <label id="statusFieldWrap" class="hidden">Status
+        <select id="taskStatus">
+          <option value="OPEN">Open</option>
+          <option value="IN_PROGRESS">In progress</option>
+          <option value="DONE">Done</option>
+        </select>
+      </label>
+      <div class="field-error" id="taskFormError"></div>
+      <div class="modal-actions">
+        <button type="button" id="cancelTaskBtn" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<footer class="site-footer">
+  Secure Task Management REST API &middot; Spring Boot + JWT + PostgreSQL &middot;
+  <a href="https://github.com/Srinithik5/taskapi" target="_blank" rel="noopener">source on GitHub</a>
+</footer>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
