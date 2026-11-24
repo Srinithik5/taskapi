@@ -3,7 +3,6 @@ package com.srinithi.taskapi.service;
 import com.srinithi.taskapi.dto.TaskCreateRequest;
 import com.srinithi.taskapi.dto.TaskResponse;
 import com.srinithi.taskapi.dto.TaskUpdateRequest;
-import com.srinithi.taskapi.entity.Role;
 import com.srinithi.taskapi.entity.Status;
 import com.srinithi.taskapi.entity.Task;
 import com.srinithi.taskapi.entity.User;
@@ -12,15 +11,12 @@ import com.srinithi.taskapi.repository.TaskRepository;
 import com.srinithi.taskapi.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TaskService {
-
-    // TEMPORARY: there's no login yet (arrives in Phase 5/6), so every request acts as
-    // this one fixed user. Replaced with the real logged-in user in Phase 6.
-    private static final String TEMP_OWNER_EMAIL = "temp-owner@example.com";
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
@@ -32,7 +28,7 @@ public class TaskService {
 
     @Transactional
     public TaskResponse create(TaskCreateRequest request) {
-        User owner = temporaryOwner();
+        User owner = currentUser();
         Task task = new Task(request.title(), request.description(), owner);
         taskRepository.save(task);
         return toResponse(task);
@@ -40,7 +36,7 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public Page<TaskResponse> list(Status status, Pageable pageable) {
-        Long ownerId = temporaryOwner().getId();
+        Long ownerId = currentUser().getId();
         Page<Task> page = (status != null)
                 ? taskRepository.findByOwnerIdAndStatus(ownerId, status, pageable)
                 : taskRepository.findByOwnerId(ownerId, pageable);
@@ -69,16 +65,29 @@ public class TaskService {
         taskRepository.delete(ownedTaskOrThrow(id));
     }
 
+    // ADMIN ONLY - deliberately separate from list() above, which is always scoped
+    // to the current user. Called only from AdminController, which SecurityConfig
+    // already restricts to ROLE_ADMIN.
+    @Transactional(readOnly = true)
+    public Page<TaskResponse> listAllForAdmin(Pageable pageable) {
+        return taskRepository.findAll(pageable).map(this::toResponse);
+    }
+
     private Task ownedTaskOrThrow(Long id) {
-        Long ownerId = temporaryOwner().getId();
+        Long ownerId = currentUser().getId();
+        // The ownership check happens IN the query (WHERE id = ? AND owner_id = ?),
+        // not by loading the task first and checking in Java - this is what makes it
+        // structurally impossible for user A to ever read user B's task. A task that
+        // exists but belongs to someone else returns 404, identical to a task that
+        // doesn't exist at all - we never reveal which.
         return taskRepository.findByIdAndOwnerId(id, ownerId)
                 .orElseThrow(() -> new NotFoundException("Task not found"));
     }
 
-    private User temporaryOwner() {
-        return userRepository.findByEmail(TEMP_OWNER_EMAIL)
-                .orElseGet(() -> userRepository.save(
-                        new User(TEMP_OWNER_EMAIL, "temporary", "Temp Owner", Role.USER)));
+    private User currentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("User not found"));
     }
 
     private TaskResponse toResponse(Task task) {

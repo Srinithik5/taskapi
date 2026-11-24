@@ -38,21 +38,10 @@ public class JwtService {
                 .compact();
     }
 
+    // Throws if the token is missing, expired, or has an invalid signature -
+    // JwtAuthFilter catches that and simply treats the request as unauthenticated.
     public String extractEmail(String token) {
         return parseClaims(token).getSubject();
-    }
-
-    public String extractRole(String token) {
-        return parseClaims(token).get("role", String.class);
-    }
-
-    public boolean isValid(String token) {
-        try {
-            parseClaims(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     private Claims parseClaims(String token) {
