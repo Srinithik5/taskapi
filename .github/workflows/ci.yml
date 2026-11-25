@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # No database service needed: unit tests use Mockito, and the repository test
+      # uses H2 (see src/test/resources/application-test.properties) - the whole
+      # suite is self-contained and runs on a bare runner with zero external setup.
+      - name: Build and test
+        run: mvn -B verify
